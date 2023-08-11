@@ -6,5 +6,6 @@
 # @File    : __init__.py.py
 # @IDE     : PyCharm
 
+from .building3d import Building3DReconstructionDataset
 
 def build_dataset(args):
