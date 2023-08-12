@@ -36,12 +36,10 @@ class Building3DReconstructionDataset(Dataset):
         return len(self.pc_files)
 
     def __getitem__(self, index):
+        # ------------------------------- Point Clouds ------------------------------
+        # load point clouds
         pc_file = self.pc_files[index]
-        wireframe_file = self.wireframe_files[index]
-
-        # load point clouds & wireframe
         pc = np.loadtxt(pc_file, dtype=np.float64)
-        wf_vertices, wf_edges = self.load_wireframe(wireframe_file)
 
         # point clouds processing
         if not self.use_color:
@@ -55,8 +53,27 @@ class Building3DReconstructionDataset(Dataset):
             point_cloud = pc
             point_cloud[:, 3:7] = point_cloud[:, 3:7] / 256.0
 
+        # ------------------------------- Wireframe ------------------------------
+        # load wireframe
+        wireframe_file = self.wireframe_files[index]
+        wf_vertices, wf_edges = self.load_wireframe(wireframe_file)
+        print(point_cloud[0])
+
+        # ------------------------------- Dataset Preprocessing ------------------------------
+        if self.normalize:
+            centroid = np.mean(point_cloud[:, 0:3], axis=0)
+            point_cloud[:, 0:3] -= centroid
+            max_distance = np.max(np.linalg.norm(point_cloud[:, 0:3], axis=1))
+            point_cloud[:, 0:3] /= max_distance
+            point_cloud = point_cloud.astype(np.float32)
+
+            wf_vertices -= centroid
+            wf_vertices /= max_distance
+            wf_vertices = wf_vertices.astype(np.float32)
+
         print(pc_file)
         print(point_cloud[0])
+        print(wf_vertices)
         #
         # if self.transform:
         #     x = self.transform(x)
