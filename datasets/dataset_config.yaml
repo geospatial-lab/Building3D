@@ -1,0 +1,7 @@
+Building3D:
+  root_dir: 'E:\Building3D\clear data\Entry-level' # Building3D dataset root dir
+  num_points: 2048
+  use_color: True
+  use_intensity: True
+  normalize: True
+  augment: False

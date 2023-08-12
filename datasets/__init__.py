@@ -8,4 +8,11 @@
 
 from .building3d import Building3DReconstructionDataset
 
-def build_dataset(args):
+
+def build_dataset(dataset_config):
+    datasets_dict = {
+        "train": Building3DReconstructionDataset(dataset_config, split_set="train"),
+        "test": Building3DReconstructionDataset(dataset_config, split_set="test"),
+    }
+
+    return datasets_dict
