@@ -19,14 +19,19 @@ class APCalculator(object):
         :return: An AP dict
         """
 
+        # ----------------------- Corners Eval based on Hungarian Mather algorithms ---------------------------
+
         predicted_labels = [[0, 1], [1, 2], [2, 3]]
         true_labels = [[0, 1], [2, 3], [1, 4], [3, 4], [4, 5], [2, 4], [1, 3]]
 
+        # ------------------------------- Edges Eval ------------------------------
         tp_edges = np.sum([e in true_labels for e in predicted_labels])
         tp_fp_edges = len(predicted_labels)
         tp_fn_edges = len(true_labels)
         # precision = tp_edges / tp_fp
         # recall = tp_edges / tp_fn
+
+        #  ------------------------------- Return AP Dict ------------------------------
         self.ap_dict['tp_edges'] += tp_edges
         self.ap_dict['num_pred_edges'] += tp_fp_edges
         self.ap_dict['num_label_edges'] += tp_fn_edges
