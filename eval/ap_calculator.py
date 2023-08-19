@@ -27,7 +27,7 @@ class APCalculator(object):
             label_edges = np.array([[0, 1], [0, 2], [1, 2], [3, 4], [4, 5],[2, 4], [1, 3], [-1, -1], [-1, -1]])
             centroid = np.array([1, 2, 3])
             max_distance = np.array([[2]])
-            predicted_score = np.array([[0.8, 0.8, 0.2, 1]]
+            predicted_score = np.array([[0.8, 0.8, 0.3, 1]]
         :return: AP Dict
         """
         batch_size = batch['batch_size']
