@@ -168,7 +168,7 @@ class Building3DReconstructionDataset(Dataset):
             try:
                 if key in ['wf_vertices', 'wf_edges']:
                     max_len = max([len(v) for v in val])
-                    wf = np.ones((len(batch), max_len, val[0].shape[-1]), dtype=np.float32) * -1
+                    wf = np.ones((len(batch), max_len, val[0].shape[-1]), dtype=np.float32) * -1e1
                     for i in range(len(batch)):
                         wf[i, :len(val[i]), :] = val[i]
                     ret_dict[key] = torch.from_numpy(wf)
