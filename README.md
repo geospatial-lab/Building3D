@@ -22,3 +22,50 @@ l 1 2
 l 1 3
 ....
 ```
+## 2. Eval
+```python
+class APCalculator(object):
+    def __init__(self, distance_thresh=0.1, confidence_thresh=0.7):
+        r"""
+        :param distance_thresh: the distance thresh
+        :param confidence_thresh: the edges confident thresh
+        """
+        self.distance_thresh = distance_thresh
+        self.confidence_thresh = confidence_thresh
+    
+    def compute_metrics(self, batch):
+        # ....
+        return None
+    
+    def output_accuracy(self):
+        # ....
+        return None
+    
+    def reset(self):
+        # ....
+        return None
+        
+
+# --------------------------------- Input Case -------------------------------------
+batch = {'batch_size': 1,
+         'predicted_corners': np.array([[[1, 2, 3], [7, 8, 9], [4, 5, 1], [7, 8, 9], [5,3,2], [1, 2, 4], [2, 5, 7], [1, 1, 1]]]),
+         'wf_vertices': np.array([[[2, 3, 4], [5, 6, 4], [6, 7, 8],[-10, -10, -10], [-10, -10, -10]]]),
+         'predicted_edges': np.array([[[1, 2], [1, 5], [5, 6], [2, 4]]]),
+         'wf_edges': np.array([[[0, 1], [0, 2], [1, 2], [3, 4], [4, 5],[2, 4], [1, 3], [-1, -1], [-1, -1]]]),
+         'predicted_score': np.array([[0.8, 0.8, 0.2, 1]]),
+          'centroid': np.array([[2, 2, 2]]),
+         'max_distance': np.array([[1]])}
+
+# --------------------------------- Output -------------------------------------
+# Average Corner offset (ACO)
+# Corners Precision (CP), Corners Recall (CR), Corners F1 (C_F1)
+# Edges Precision (EP), Edges Recall (ER), Edges F1 (E_F1)
+print('Average Corner offset', self.ap_dict['average_corner_offset'])
+print('Corners Precision: ', self.ap_dict['corners_precision'])
+print('Corners Recall: ', self.ap_dict['corners_recall'])
+print('Corners F1：', self.ap_dict['corners_f1'])
+
+print('Edges Precision: ', self.ap_dict['edges_precision'])
+print('Edges Recall: ', self.ap_dict['edges_recall'])
+print('Edges F1: ', self.ap_dict['edges_f1'])
+```

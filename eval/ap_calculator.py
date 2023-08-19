@@ -8,8 +8,6 @@ class APCalculator(object):
         r"""
         :param distance_thresh: the distance thresh
         :param confidence_thresh: the edges confident thresh
-        ap_dict: num_pred_edges == tp + fp (edges)
-                 num_label_edges == tp + fn (edges)
         """
         self.distance_thresh = distance_thresh
         self.confidence_thresh = confidence_thresh
