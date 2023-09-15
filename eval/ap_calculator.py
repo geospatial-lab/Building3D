@@ -71,7 +71,7 @@ class APCalculator(object):
                     p_edges[i, j] = corners_map[p_edges[i, j]] if p_edges[i, j] in corners_map else -1
                 p_edges[i] = sorted(p_edges[i])
 
-            tp_edges = np.sum([np.any(np.all(e == l_edges, axis=1)) for e in predicted_edges[b]])
+            tp_edges = np.sum([np.any(np.all(e == l_edges, axis=1)) for e in p_edges])
             tp_fp_edges = len(p_edges)
             tp_fn_edges = len(l_edges)
             # precision = tp_edges / tp_fp
