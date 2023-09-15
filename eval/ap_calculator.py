@@ -65,7 +65,7 @@ class APCalculator(object):
 
             # ------------------------------- Edges Eval ------------------------------
             corners_map = {key: value for key, value in
-                           zip(tp_corners_predict_indices[mask], tp_corners_label_indices[mask])}
+                           zip(tp_corners_predict_indices, tp_corners_label_indices)}
             for i, _ in enumerate(p_edges):
                 for j in range(2):
                     p_edges[i, j] = corners_map[p_edges[i, j]] if p_edges[i, j] in corners_map else -1
