@@ -1,10 +1,12 @@
+import os
+
 import numpy as np
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 
 
 class APCalculator(object):
-    def __init__(self, distance_thresh=0.1, confidence_thresh=0.7):
+    def __init__(self, distance_thresh=4, confidence_thresh=0.7):
         r"""
         :param distance_thresh: the distance thresh
         :param confidence_thresh: the edges confident thresh
@@ -30,52 +32,57 @@ class APCalculator(object):
             predicted_score = np.array([[0.8, 0.8, 0.3, 1]]
         :return: AP Dict
         """
-        batch_size = batch['batch_size']
-        predicted_corners, predicted_edges, predicted_score = batch['predicted_corners'], batch['predicted_edges'], \
-            batch['predicted_score']
+        batch_size = len(batch['predicted_corners'])
+        predicted_corners, predicted_edges = batch['predicted_corners'], batch['predicted_edges']
         label_corners, label_edges = batch['wf_vertices'], batch['wf_edges']
-        centroid, max_distance = batch['centroid'], batch['max_distance']
+        # centroid, max_distance = batch['centroid'], batch['max_distance']
 
         for b in range(batch_size):
+            print(b)
+            if b == 239:
+                print()
             # ----------------------- Confidence Thresh ---------------------------
-            p_edges = predicted_edges[b][predicted_score[b] > self.confidence_thresh]
+            p_edges = predicted_edges[b]
             predicted_edges_indices = p_edges.flatten()
             used_predicted_edges_indices = np.unique(predicted_edges_indices)
-            p_corners = predicted_corners[b][used_predicted_edges_indices]
-            index_mapping = {old_index: new_index for new_index, old_index in enumerate(used_predicted_edges_indices)}
-            p_edges = np.vectorize(index_mapping.get)(p_edges)
+            if len(used_predicted_edges_indices) != 0:
+                p_corners = predicted_corners[b][used_predicted_edges_indices]
+                index_mapping = {old_index: new_index for new_index, old_index in enumerate(used_predicted_edges_indices)}
+                p_edges = np.vectorize(index_mapping.get)(p_edges)
 
-            l_edges = label_edges[b][np.sum(label_edges[b], -1, keepdims=False) > 0]
-            l_corners = label_corners[b][np.sum(label_corners[b], -1, keepdims=False) > -10]
+                l_edges = label_edges[b][np.sum(label_edges[b], -1, keepdims=False) > 0]
+                l_corners = label_corners[b][np.sum(label_corners[b], -1, keepdims=False) > -10]
 
-            # ----------------------- Corners Eval based on Hungarian Mather algorithms ---------------------------
-            # Calculate the distance matrix
-            distance_matrix = cdist(p_corners, l_corners)
-            predict_indices, label_indices = linear_sum_assignment(distance_matrix)
-            mask = distance_matrix[predict_indices, label_indices] <= self.distance_thresh
-            tp_corners_predict_indices, tp_corners_label_indices = predict_indices[mask], label_indices[mask]
-            tp_corners = len(tp_corners_predict_indices)
-            tp_fp_corners = len(p_corners)
-            tp_fn_corners = len(l_corners)
+                # ----------------------- Corners Eval based on Hungarian Mather algorithms ---------------------------
+                # Calculate the distance matrix
+                distance_matrix = cdist(p_corners, l_corners)
+                predict_indices, label_indices = linear_sum_assignment(distance_matrix)
+                mask = distance_matrix[predict_indices, label_indices] <= self.distance_thresh
+                tp_corners_predict_indices, tp_corners_label_indices = predict_indices[mask], label_indices[mask]
+                tp_corners = len(tp_corners_predict_indices)
+                tp_fp_corners = len(p_corners)
+                tp_fn_corners = len(l_corners)
 
-            # ----------------------- Average Corners Offset---------------------------
-            distances = np.linalg.norm((p_corners[tp_corners_predict_indices] * max_distance[b] + centroid[b]) - (
-                    l_corners[tp_corners_label_indices] * max_distance[b] + centroid[b]), axis=1)
-            distances = np.sum(distances)
+                # ----------------------- Average Corners Offset---------------------------
+                distances = np.linalg.norm((p_corners[tp_corners_predict_indices]) - (
+                        l_corners[tp_corners_label_indices]), axis=1)
+                distances = np.sum(distances)
 
-            # ------------------------------- Edges Eval ------------------------------
-            corners_map = {key: value for key, value in
-                           zip(tp_corners_predict_indices[mask], tp_corners_label_indices[mask])}
-            for i, _ in enumerate(p_edges):
-                for j in range(2):
-                    p_edges[i, j] = corners_map[p_edges[i, j]] if p_edges[i, j] in corners_map else -1
-                p_edges[i] = sorted(p_edges[i])
+                # ------------------------------- Edges Eval ------------------------------
+                corners_map = {key: value for key, value in
+                               zip(tp_corners_predict_indices, tp_corners_label_indices)}
+                for i, _ in enumerate(p_edges):
+                    for j in range(2):
+                        p_edges[i, j] = corners_map[p_edges[i, j]] if p_edges[i, j] in corners_map else -1
+                    p_edges[i] = sorted(p_edges[i])
 
-            tp_edges = np.sum([np.any(np.all(e == l_edges, axis=1)) for e in predicted_edges[b]])
-            tp_fp_edges = len(p_edges)
-            tp_fn_edges = len(l_edges)
+                tp_edges = np.sum([np.any(np.all(e == l_edges, axis=1)) for e in predicted_edges[b]])
+                tp_fp_edges = len(p_edges)
+                tp_fn_edges = len(l_edges)
             # precision = tp_edges / tp_fp
             # recall = tp_edges / tp_fn
+            else:
+                tp_corners, tp_fp_corners, tp_fn_corners, distances, tp_edges, tp_fp_edges, tp_fn_edges = 0, 0, len(label_corners[b]), 0, 0, 0, len(label_edges[b])
 
             # ------------------------------- Return AP Dict ------------------------------
             self.ap_dict['tp_corners'] += tp_corners
@@ -113,3 +120,60 @@ class APCalculator(object):
         self.ap_dict = {'tp_corners': 0, 'num_pred_corners': 0, 'num_label_corners': 0, 'distance': 0, 'tp_edges': 0,
                         'num_pred_edges': 0, 'num_label_edges': 0, 'average_corner_offset': 0, 'corners_precision': 0,
                         'corners_recall': 0, 'corners_f1': 0, 'edges_precision': 0, 'edges_recall': 0, 'edges_f1': 0}
+
+
+if __name__ == '__main__':
+    AP = APCalculator()
+    batch = {}
+    result_folder = r'C:\Users\12617\Downloads\Tallinn_test_wirfram_without_pretrained\Tallinn_test_wirfram_without_pretrained'
+    gt_folder = r'E:\Building3D\final data\Tallinn\test\wireframe'
+
+    batch_size = 0
+    predicted_corners, predicted_edges = [], []
+    label_corners, label_edges = [], []
+    i = 0
+    for file in os.listdir(gt_folder):
+        if i == 300:
+            print()
+        i += 1
+        gt_file = gt_folder + '/' + file
+        with open(gt_file, 'r') as f:
+            lines = f.readlines()
+            vertices = []
+            l = []
+            for line in lines:
+                line = line.strip().split(' ')
+                if line[0] == 'v':
+                    vertices.append([float(line[1]), float(line[2]), float(line[3])])
+                elif line[0] == 'l':
+                    l.append([int(line[1])-1, int(line[2])-1])
+            vertices = np.array(vertices)
+            l = np.array(l)
+        # label_corners.append(vertices)
+        # label_edges.append(l)
+
+        res_file = result_folder + '/' + file.split('.')[0] + '_vertex.obj'
+        if os.path.exists(res_file):
+            label_corners.append(vertices)
+            label_edges.append(l)
+            with open(res_file, 'r') as f:
+                lines = f.readlines()
+                vertices = []
+                l = []
+                for line in lines:
+                    line = line.strip().split(' ')
+                    if line[0] == 'v':
+                        vertices.append([float(line[1]), float(line[2]), float(line[3])])
+                    elif line[0] == 'l':
+                        l.append([int(line[1])-1, int(line[2])-1])
+                vertices = np.array(vertices)
+                l = np.array(l)
+            predicted_corners.append(vertices)
+            predicted_edges.append(l)
+        # else:
+        #     predicted_corners.append(np.array([]))
+        #     predicted_edges.append(np.array([]))
+    batch = {'predicted_corners': predicted_corners, 'predicted_edges': predicted_edges, 'wf_edges': label_edges, "wf_vertices": label_corners}
+    AP.compute_metrics(batch)
+    AP.output_accuracy()
+    print()
