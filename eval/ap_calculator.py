@@ -186,7 +186,7 @@ class APCalculator(object):
                 The submission systems in the Building3D website that is coming soon in a few days will include that.
                     distance_matrix = cdist(predicted_corners, label_corners)
                     predict_indices, label_indices = linear_sum_assignment(distance_matrix)
-                    mask = distance_matrix[predict_indices, label_indices] <= 0.05
+                    mask = distance_matrix[predict_indices, label_indices] <= 0.1
                     tp_corners_predict_indices, tp_corners_label_indices = predict_indices[mask], label_indices[mask]
                     tp_corners = len(tp_corners_predict_indices)
                     tp_fp_corners = len(predicted_corners)
@@ -227,6 +227,7 @@ class APCalculator(object):
         self.ap_dict['edges_f1'] = 2 * self.ap_dict['edges_precision'] * self.ap_dict['edges_recall'] / (
                 self.ap_dict['edges_precision'] + self.ap_dict['edges_recall'])
 
+        print('Wireframe Edit distance', self.ap_dict['average_wed'])
         print('Average Corner offset', self.ap_dict['average_corner_offset'])
         print('Corners Precision: ', self.ap_dict['corners_precision'])
         print('Corners Recall: ', self.ap_dict['corners_recall'])
