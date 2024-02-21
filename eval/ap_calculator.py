@@ -105,32 +105,36 @@ class APCalculator(object):
 
     def compute_metrics(self, batch):
         r"""
-        :param batch: batch_size, predicted_corners, predicted_edges, predicted_score, wf_vertices, wf_edges, centroid,
+        :param batch: batch_size, predicted_corners, predicted_edges, wf_vertices, wf_edges, centroid,
         max_distance
         : test case
             batch_size = np.array([1])
-            predicted_vertices = np.array([[1, 2, 3], [7, 8, 9], [4, 5, 1], [7, 8, 9], [5,3,2], [1, 2, 4], [2, 5, 7]])
-            label_corners = np.array([[2, 3, 4], [5, 6, 4], [6, 7, 8]])
-            predicted_edges = np.array([[1, 2], [1, 5], [2, 4]])
-            label_edges = np.array([[0, 1], [0, 2], [1, 2], [3, 4], [4, 5],[2, 4], [1, 3], [-1, -1], [-1, -1]])
+            predicted_vertices = np.array([[1, 2, 3], [7, 8, 9], [4, 5, 1], [7, 8, 9], [5, 3, 2], [1, 2, 4], [2, 5, 7]])  xyz coordinates
+            predicted_edges = np.array([[1, 2], [1, 5], [2, 4]]) # edge vertices index
+            pred_edges_vertices = np.array([[[7, 8, 9], [4, 5, 1]],
+                                            [[7, 8, 9], [1, 2, 4]],
+                                            [[4, 5, 1], [5, 3, 2]]])
             centroid = np.array([1, 2, 3])
             max_distance = np.array([[2]])
-            predicted_score = np.array([[0.8, 0.8, 0.3, 1]]
+
+            label_corners = np.array([[2, 3, 4], [5, 6, 4], [6, 7, 8]])
+            label_edges = np.array([[0, 1], [0, 2], [1, 2], [3, 4], [4, 5],[2, 4], [1, 3], [-1, -1], [-1, -1]])
         :return: AP Dict
         """
         batch_size = len(batch['predicted_vertices'])
         predicted_corners, predicted_edges = batch['predicted_vertices'], batch['predicted_edges']
         pred_edges_vertices = batch['pred_edges_vertices']
+
         label_corners, label_edges = batch['wf_vertices'], batch['wf_edges']
         label_edges_vertices = batch['wf_edges_vertices']
         # centroid, max_distance = batch['centroid'], batch['max_distance']
 
         for b in range(batch_size):
             # ----------------------- Confidence Thresh ---------------------------
-            p_edges = predicted_edges[b]
-            predicted_edges_indices = p_edges.flatten()
-            used_predicted_edges_indices = np.unique(predicted_edges_indices)
-            if len(used_predicted_edges_indices) != 0:
+            # p_edges = predicted_edges[b]
+            # predicted_edges_indices = p_edges.flatten()
+            # used_predicted_edges_indices = np.unique(predicted_edges_indices)
+            if len(predicted_edges) != 0:
                 new_hausdorff_distance = hausdorff_distance_line(pred_edges_vertices, label_edges_vertices)
                 new_predict_indices, new_label_indices = linear_sum_assignment(
                     new_hausdorff_distance)

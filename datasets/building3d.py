@@ -145,7 +145,7 @@ class Building3DReconstructionDataset(Dataset):
             point_cloud[:, 0:3] = np.dot(point_cloud[:, 0:3], np.transpose(rot_mat))
             wf_vertices[:, 0:3] = np.dot(wf_vertices[:, 0:3], np.transpose(rot_mat))
 
-        # ------------------------------- WFTR Ground Truth ------------------------
+        # -------------------------------Edge Vertices ------------------------
         wf_edges_vertices = np.stack((wf_vertices[wf_edges[:, 0]], wf_vertices[wf_edges[:, 1]]), axis=1)
         wf_edges_vertices = wf_edges_vertices[
             np.arange(wf_edges_vertices.shape[0])[:, np.newaxis], np.flip(np.argsort(wf_edges_vertices[:, :, -1]),
