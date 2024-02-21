@@ -35,7 +35,12 @@ def hausdorff_distance_line(p_line, t_line, sample_points=20):
 
     return hausdorff_matrix
 
+
 def graph_edit_distance(pd_vertices, pd_edges, gt_vertices, gt_edges, wed_v):
+    '''
+    :param wed_v: positive corners edit distance
+    :return:
+    '''
     wed_e = 0
     if len(pd_vertices) > 0:
         distances = cdist(pd_vertices, gt_vertices)
@@ -75,6 +80,7 @@ def graph_edit_distance(pd_vertices, pd_edges, gt_vertices, gt_edges, wed_v):
     wde = (wed_e + wed_v) / sum_distance
     return wde
 
+
 def computer_edges(edges, vertices):
     # return edge index
     index = []
@@ -91,6 +97,7 @@ def computer_edges(edges, vertices):
 
     return np.sort(np.array(index), axis=-1)
 
+
 class APCalculator(object):
     def __init__(self, distance_thresh=4, confidence_thresh=0.7):
         r"""
@@ -99,8 +106,9 @@ class APCalculator(object):
         """
         self.distance_thresh = distance_thresh
         self.confidence_thresh = confidence_thresh
-        self.ap_dict = {'tp_corners': 0, 'num_pred_corners': 0, 'num_label_corners': 0, 'distance': 0, 'tp_edges': 0,
-                        'num_pred_edges': 0, 'num_label_edges': 0, 'average_corner_offset': 0, 'corners_precision': 0,
+        self.batch_size = 0
+        self.ap_dict = {'tp_corners': 0, 'tp_fp_corners': 0, 'tp_fn_corners': 0, 'distance': 0, 'tp_edges': 0,
+                        'tp_fp_edges': 0, 'tp_fn_edges': 0, 'average_corner_offset': 0, 'corners_precision': 0,
                         'corners_recall': 0, 'corner_f1': 0, 'edges_precision': 0, 'edges_recall': 0, 'edges_f1': 0}
 
     def compute_metrics(self, batch):
@@ -122,6 +130,7 @@ class APCalculator(object):
         :return: AP Dict
         """
         batch_size = len(batch['predicted_vertices'])
+        self.batch_size = batch_size
         predicted_corners, predicted_edges = batch['predicted_vertices'], batch['predicted_edges']
         pred_edges_vertices = batch['pred_edges_vertices']
 
@@ -130,46 +139,59 @@ class APCalculator(object):
         # centroid, max_distance = batch['centroid'], batch['max_distance']
 
         for b in range(batch_size):
-            # ----------------------- Confidence Thresh ---------------------------
-            # p_edges = predicted_edges[b]
-            # predicted_edges_indices = p_edges.flatten()
-            # used_predicted_edges_indices = np.unique(predicted_edges_indices)
+            # ----------------------- Matching Edges ---------------------------
+            # Determine whether the results include the edges.
+            # When it only includes corners without any edges, the result will be considered as an empty model.
             if len(predicted_edges) != 0:
-                new_hausdorff_distance = hausdorff_distance_line(pred_edges_vertices, label_edges_vertices)
-                new_predict_indices, new_label_indices = linear_sum_assignment(
-                    new_hausdorff_distance)
-                edge_mask = new_hausdorff_distance[new_predict_indices, new_label_indices] <= 0.1
-                pr_corners = pred_edges_vertices[new_predict_indices[edge_mask]]
-                gt_corners = label_edges_vertices[new_label_indices[edge_mask]]
+                # Calculate the edge distance to get the positive edges
+                edge_distance = hausdorff_distance_line(pred_edges_vertices, label_edges_vertices)
+                predict_indices, label_indices = linear_sum_assignment(
+                    edge_distance)
+                # get the positive corners
+                edge_mask = edge_distance[predict_indices, label_indices] <= 0.1
+                pr_corners = pred_edges_vertices[predict_indices[edge_mask]]
+                gt_corners = label_edges_vertices[label_indices[edge_mask]]
 
-                tp_corners = len(np.unique(pr_corners.reshape(-1, 3), axis=0))
-                tp_fp_corners = len(predicted_corners)
-                tp_fn_corners = len(label_corners)
+                # Get corner accuracy
+                tp_corners = len(np.unique(pr_corners.reshape(-1, 3), axis=0))  # positive corners
+                tp_fp_corners = len(predicted_corners)  # predicted corners
+                tp_fn_corners = len(label_corners)  # label corners
 
-                # distances = 0
-                pr_vertices = np.unique(pr_corners.reshape(-1, 3), axis=0)
-                gt_vertices = np.unique(gt_corners.reshape(-1, 3), axis=0)
-                distance_matrix = cdist(pr_vertices, gt_vertices)
-                predict_indices, label_indices = linear_sum_assignment(distance_matrix)
-                mask = distance_matrix[predict_indices, label_indices] <= 0.1
-                predict_indices = predict_indices[mask]
-                label_indices = label_indices[mask]
-                distances = np.sum(
-                    distance_matrix[predict_indices, label_indices][:, np.newaxis])
-                tp_edges = sum(edge_mask)
+                # Get edge accuracy
+                tp_edges = sum(edge_mask)  # positive edges
                 tp_fp_edges = len(predicted_edges)
                 tp_fn_edges = len(label_edges)
 
+                # Calculate the positive corner offsets
+                pr_vertices = np.unique(pr_corners.reshape(-1, 3), axis=0)
+                gt_vertices = np.unique(gt_corners.reshape(-1, 3), axis=0)
+                distance_matrix = cdist(pr_vertices, gt_vertices)
+                min_distance = np.min(distance_matrix, axis=1)
+                distances = np.sum(min_distance)
+
                 # wireframe edit distance
-                for k, indices in enumerate(new_predict_indices[edge_mask]):
-                    pred_edges_vertices[indices] = label_edges_vertices[new_label_indices[edge_mask][k]]
+                for k, indices in enumerate(predict_indices[edge_mask]):
+                    pred_edges_vertices[indices] = label_edges_vertices[label_indices[edge_mask][k]]
                 predicted_corners = label_edges_vertices.reshape(-1, 3)
                 predicted_corners = np.unique(predicted_corners, axis=0)
-                submission_edges = computer_edges(label_edges_vertices, predicted_corners)
-                wde = graph_edit_distance(predicted_corners, submission_edges.copy(), label_corners.copy(),
+                submission_edges = computer_edges(label_edges_vertices, predicted_corners) # get the edge index
+                wed = graph_edit_distance(predicted_corners, submission_edges.copy(), label_corners.copy(),
                                           label_edges.copy(), distances)
 
             else:
+                # When it only includes corners without any edges, the result will be considered as an empty model.
+                '''
+                The code considers the results only include corners.. 
+                Actually, the paper results consider it, but the workshop doesn't consider it.
+                The submission systems in the Building3D website that is coming soon in a few days will include that.
+                    distance_matrix = cdist(predicted_corners, label_corners)
+                    predict_indices, label_indices = linear_sum_assignment(distance_matrix)
+                    mask = distance_matrix[predict_indices, label_indices] <= 0.05
+                    tp_corners_predict_indices, tp_corners_label_indices = predict_indices[mask], label_indices[mask]
+                    tp_corners = len(tp_corners_predict_indices)
+                    tp_fp_corners = len(predicted_corners)
+                    tp_fn_corners = len(label_corners)
+                '''
                 tp_corners = 0
                 tp_fp_corners = 0
                 tp_fn_corners = len(label_corners)
@@ -177,30 +199,33 @@ class APCalculator(object):
                 tp_fp_edges = 0
                 tp_fn_edges = len(label_edges)
                 distances = 0
-                wde = 1
+                wed = 1
 
             # ------------------------------- Return AP Dict ------------------------------
             self.ap_dict['tp_corners'] += tp_corners
-            self.ap_dict['num_pred_corners'] += tp_fp_corners
-            self.ap_dict['num_label_corners'] += tp_fn_corners
+            self.ap_dict['tp_fp_corners'] += tp_fp_corners
+            self.ap_dict['tp_fn_corners'] += tp_fn_corners
 
             self.ap_dict['distance'] += distances
+            self.ap_dict['wed'] += wed
 
             self.ap_dict['tp_edges'] += tp_edges
-            self.ap_dict['num_pred_edges'] += tp_fp_edges
-            self.ap_dict['num_label_edges'] += tp_fn_edges
+            self.ap_dict['tp_fp_edges'] += tp_fp_edges
+            self.ap_dict['tp_fn_edges'] += tp_fn_edges
 
     def output_accuracy(self):
         self.ap_dict['average_corner_offset'] = self.ap_dict['distance'] / self.ap_dict['tp_corners']
-        self.ap_dict['corners_precision'] = self.ap_dict['tp_corners'] / self.ap_dict['num_pred_corners']
-        self.ap_dict['corners_recall'] = self.ap_dict['tp_corners'] / self.ap_dict['num_label_corners']
+        self.ap_dict['average_wed'] = self.ap_dict['wed'] / self.batch_size
+
+        self.ap_dict['corners_precision'] = self.ap_dict['tp_corners'] / self.ap_dict['tp_fp_corners']
+        self.ap_dict['corners_recall'] = self.ap_dict['tp_corners'] / self.ap_dict['tp_fn_corners']
         self.ap_dict['corners_f1'] = 2 * self.ap_dict['corners_precision'] * self.ap_dict['corners_recall'] / (
                 self.ap_dict['corners_precision'] + self.ap_dict['corners_recall'])
 
-        self.ap_dict['edges_precision'] = self.ap_dict['tp_edges'] / self.ap_dict['num_pred_edges']
-        self.ap_dict['edges_recall'] = self.ap_dict['tp_edges'] / self.ap_dict['num_label_edges']
+        self.ap_dict['edges_precision'] = self.ap_dict['tp_edges'] / self.ap_dict['tp_fp_edges']
+        self.ap_dict['edges_recall'] = self.ap_dict['tp_edges'] / self.ap_dict['tp_fn_edges']
         self.ap_dict['edges_f1'] = 2 * self.ap_dict['edges_precision'] * self.ap_dict['edges_recall'] / (
-                    self.ap_dict['edges_precision'] + self.ap_dict['edges_recall'])
+                self.ap_dict['edges_precision'] + self.ap_dict['edges_recall'])
 
         print('Average Corner offset', self.ap_dict['average_corner_offset'])
         print('Corners Precision: ', self.ap_dict['corners_precision'])
@@ -212,7 +237,6 @@ class APCalculator(object):
         print('Edges F1: ', self.ap_dict['edges_f1'])
 
     def reset(self):
-        self.ap_dict = {'tp_corners': 0, 'num_pred_corners': 0, 'num_label_corners': 0, 'distance': 0, 'tp_edges': 0,
-                        'num_pred_edges': 0, 'num_label_edges': 0, 'average_corner_offset': 0, 'corners_precision': 0,
+        self.ap_dict = {'tp_corners': 0, 'tp_fp_corners': 0, 'tp_fn_corners': 0, 'distance': 0, 'tp_edges': 0,
+                        'tp_fp_edges': 0, 'tp_fn_edges': 0, 'average_corner_offset': 0, 'corners_precision': 0,
                         'corners_recall': 0, 'corners_f1': 0, 'edges_precision': 0, 'edges_recall': 0, 'edges_f1': 0}
-
