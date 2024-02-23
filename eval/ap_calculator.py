@@ -98,6 +98,12 @@ def computer_edges(edges, vertices):
     return np.sort(np.array(index), axis=-1)
 
 
+def remove_corners(corner_a, corner_b):
+    corner_a_view = corner_a.view([('', corner_a.dtype)] * corner_a.shape[1])
+    corner_b_view = corner_b.view([('', corner_b.dtype)] * corner_b.shape[1])
+    corner = np.setdiff1d(corner_a_view, corner_b_view).view(corner_a.dtype).reshape(-1, corner_a.shape[1])
+    return corner
+
 class APCalculator(object):
     def __init__(self, distance_thresh=4, confidence_thresh=0.7):
         r"""
@@ -152,6 +158,14 @@ class APCalculator(object):
                 pr_corners = pred_edges_vertices[predict_indices[edge_mask]]
                 gt_corners = label_edges_vertices[label_indices[edge_mask]]
 
+                # Calculate independent corners that aren't used in the edges
+                un_match_pr_corners = remove_corners(predicted_corners, np.unique(pr_corners.reshape(-1, 3), axis=0))
+                un_match_gt_corners = remove_corners(label_corners, np.unique(gt_corners.reshape(-1, 3), axis=0))
+                distance_matrix = cdist(un_match_pr_corners, un_match_gt_corners)
+                predict_indices, label_indices = linear_sum_assignment(distance_matrix)
+                mask = distance_matrix[predict_indices, label_indices] <= 0.1
+                distances = np.sum(distance_matrix[predict_indices[mask], label_indices[mask]])
+
                 # Get corner accuracy
                 tp_corners = len(np.unique(pr_corners.reshape(-1, 3), axis=0))  # positive corners
                 tp_fp_corners = len(predicted_corners)  # predicted corners
@@ -167,7 +181,7 @@ class APCalculator(object):
                 gt_vertices = np.unique(gt_corners.reshape(-1, 3), axis=0)
                 distance_matrix = cdist(pr_vertices, gt_vertices)
                 min_distance = np.min(distance_matrix, axis=1)
-                distances = np.sum(min_distance)
+                distances += np.sum(min_distance)
 
                 # wireframe edit distance
                 for k, indices in enumerate(predict_indices[edge_mask]):
@@ -180,25 +194,20 @@ class APCalculator(object):
 
             else:
                 # When it only includes corners without any edges, the result will be considered as an empty model.
-                '''
-                The code considers the results only include corners.. 
-                Actually, the paper results consider it, but the workshop doesn't consider it.
-                The submission systems in the Building3D website that is coming soon in a few days will include that.
-                    distance_matrix = cdist(predicted_corners, label_corners)
-                    predict_indices, label_indices = linear_sum_assignment(distance_matrix)
-                    mask = distance_matrix[predict_indices, label_indices] <= 0.1
-                    tp_corners_predict_indices, tp_corners_label_indices = predict_indices[mask], label_indices[mask]
-                    tp_corners = len(tp_corners_predict_indices)
-                    tp_fp_corners = len(predicted_corners)
-                    tp_fn_corners = len(label_corners)
-                '''
-                tp_corners = 0
-                tp_fp_corners = 0
+
+                # Calculate independent corners that aren't used in the edges
+                distance_matrix = cdist(predicted_corners, label_corners)
+                predict_indices, label_indices = linear_sum_assignment(distance_matrix)
+                mask = distance_matrix[predict_indices, label_indices] <= 0.1
+                tp_corners_predict_indices, tp_corners_label_indices = predict_indices[mask], label_indices[mask]
+                distances = np.sum(distance_matrix[predict_indices[mask], label_indices[mask]])
+                tp_corners = len(tp_corners_predict_indices)
+                tp_fp_corners = len(predicted_corners)
                 tp_fn_corners = len(label_corners)
+
                 tp_edges = 0
                 tp_fp_edges = 0
                 tp_fn_edges = len(label_edges)
-                distances = 0
                 wed = 1
 
             # ------------------------------- Return AP Dict ------------------------------
